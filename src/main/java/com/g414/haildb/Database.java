@@ -106,26 +106,12 @@ public class Database {
 				.getOpenFilesLimit()));
 		Util.assertSuccess(HailDB.ib_cfg_set("autoextend_increment", c
 				.getAutoextendIncrementSizePages()));
-		Util.assertSuccess(HailDB.ib_cfg_set("file_io_threads", c
-				.getFileIOThreads()));
-		Util.assertSuccess(HailDB.ib_cfg_set("read_io_threads", c
-				.getReadIOThreads()));
 		Util.assertSuccess(HailDB.ib_cfg_set("io_capacity", c
 				.getIoCapacityIOPS()));
 		Util.assertSuccess(HailDB.ib_cfg_set("sync_spin_loops", c
 				.getSyncSpinLoops()));
 		Util.assertSuccess(HailDB.ib_cfg_set("lock_wait_timeout", c
 				.getLockWaitTimeoutSeconds()));
-
-		Util.assertSuccess(HailDB.ib_cfg_set("write_io_threads", c
-				.getWriteIOThreads()));
-
-		// Util.assertSuccess(InnoDB.ib_cfg_set("log_buffer_size", c
-		// .getLogBufferSize()));
-		// Util.assertSuccess(InnoDB.ib_cfg_set("log_file_size", c
-		// .getLogFileSize()));
-		// Util.assertSuccess(InnoDB.ib_cfg_set("log_files_in_group", c
-		// .getLogFilesInGroup()));
 
 		Util.assertSuccess(HailDB.ib_startup(c.getFileFormat().getCode()));
 

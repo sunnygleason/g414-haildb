@@ -22,9 +22,6 @@ public class DatabaseConfiguration {
     private String datafilePath = "ibdata1:16M:autoextend";
     private boolean doublewriteEnabled = true;
     private FileFormat fileFormat = FileFormat.BARRACUDA;
-    private int fileIOThreads = 4;
-    private int readIOThreads = 4;
-    private int writeIOThreads = 4;
     private int openFilesLimit = 300;
     private int lockWaitTimeoutSeconds = 60;
     private String logBufferSize = "1M";
@@ -123,30 +120,6 @@ public class DatabaseConfiguration {
 
     public void setFileFormat(FileFormat fileFormat) {
         this.fileFormat = fileFormat;
-    }
-
-    public int getFileIOThreads() {
-        return fileIOThreads;
-    }
-
-    public void setFileIOThreads(int fileIOThreads) {
-        this.fileIOThreads = fileIOThreads;
-    }
-
-    public int getReadIOThreads() {
-        return readIOThreads;
-    }
-
-    public void setReadIOThreads(int readIOThreads) {
-        this.readIOThreads = readIOThreads;
-    }
-
-    public int getWriteIOThreads() {
-        return writeIOThreads;
-    }
-
-    public void setWriteIOThreads(int writeIOThreads) {
-        this.writeIOThreads = writeIOThreads;
     }
 
     public int getOpenFilesLimit() {
