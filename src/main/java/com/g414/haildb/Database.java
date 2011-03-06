@@ -89,11 +89,6 @@ public class Database {
 		Util.assertSuccess(HailDB.ib_cfg_set("force_recovery", c
 				.getRecoveryMethod().getCode()));
 
-		Util.assertSuccess(HailDB.ib_cfg_set("additional_mem_pool_size", c
-				.getAdditionalMemPoolSize()));
-		Util.assertSuccess(HailDB.ib_cfg_set("buffer_pool_size", c
-				.getBufferPoolSize()));
-
 		Util.assertSuccess(HailDB.ib_cfg_set("lru_block_access_recency", c
 				.getLruBlockAccessRecency()));
 		Util.assertSuccess(HailDB.ib_cfg_set("lru_old_blocks_pct", c
