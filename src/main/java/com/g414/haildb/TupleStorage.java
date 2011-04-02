@@ -60,6 +60,14 @@ public class TupleStorage {
             return false;
         }
 
+        if (a instanceof String) {
+            a = coerceType((String) a, type);
+        }
+
+        if (b instanceof String) {
+            b = coerceType((String) b, type);
+        }
+
         switch (type) {
         case BLOB:
         case BINARY:
