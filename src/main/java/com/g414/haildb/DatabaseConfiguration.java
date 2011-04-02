@@ -15,9 +15,9 @@ public class DatabaseConfiguration {
     private boolean rollbackOnTimeoutEnabled = false;
     private boolean adaptiveHashEnabled = false;
     private boolean adaptiveFlushingEnabled = false;
-    private String additionalMemPoolSize = "16M";
+    private long additionalMemPoolSize = 16 * 1024 * 1024;
     private int autoextendIncrementSizePages = 8;
-    private String bufferPoolSize = "16M";
+    private long bufferPoolSize = 128 * 1024 * 1024;
     private boolean pageChecksumsEnabled = true;
     private String datafilePath = "ibdata1:16M:autoextend";
     private boolean doublewriteEnabled = true;
@@ -50,11 +50,11 @@ public class DatabaseConfiguration {
         this.adaptiveFlushingEnabled = adaptiveFlushingEnabled;
     }
 
-    public String getAdditionalMemPoolSize() {
+    public long getAdditionalMemPoolSize() {
         return additionalMemPoolSize;
     }
 
-    public void setAdditionalMemPoolSize(String additionalMemPoolSize) {
+    public void setAdditionalMemPoolSize(long additionalMemPoolSize) {
         this.additionalMemPoolSize = additionalMemPoolSize;
     }
 
@@ -74,11 +74,11 @@ public class DatabaseConfiguration {
         this.autoextendIncrementSizePages = autoextendIncrementSizePages;
     }
 
-    public String getBufferPoolSize() {
+    public long getBufferPoolSize() {
         return bufferPoolSize;
     }
 
-    public void setBufferPoolSize(String bufferPoolSize) {
+    public void setBufferPoolSize(long bufferPoolSize) {
         this.bufferPoolSize = bufferPoolSize;
     }
 

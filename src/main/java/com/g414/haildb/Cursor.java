@@ -26,10 +26,10 @@ public class Cursor {
     }
 
     public Tuple createClusteredIndexReadTuple() {
-        if (this.index != null) {
-            throw new IllegalArgumentException(
-                    "Secondary index cursor may not create cluster read tuples");
-        }
+        // if (this.index != null) {
+        // throw new IllegalArgumentException(
+        // "Secondary index cursor may not create cluster read tuples");
+        // }
 
         return new Tuple(HailDB.ib_clust_read_tuple_create(crsr.getValue()),
                 table.getColDefs());
@@ -49,7 +49,7 @@ public class Cursor {
         for (int i = 0; i < tuple.getSize(); i++) {
             Object value = values.get(i);
             ColumnDef colDef = table.getColDefs().get(i);
-            setValue(searchTuple, colDef, i, value);
+            setValue(searchTuple, colDef, i, value, true);
         }
 
         return searchTuple;
@@ -79,7 +79,7 @@ public class Cursor {
         for (int i = 0; i < tuple.getSize(); i++) {
             Object value = values.get(i);
             ColumnDef colDef = index.getColumns().get(i);
-            setValue(searchTuple, colDef, i, value);
+            setValue(searchTuple, colDef, i, value, true);
         }
 
         return searchTuple;
@@ -97,8 +97,8 @@ public class Cursor {
 
         PointerByReference indexCrsr = new PointerByReference();
 
-        Util.assertSuccess(HailDB.ib_cursor_open_index_using_name(crsr
-                .getValue(), indexName, indexCrsr));
+        Util.assertSuccess(HailDB.ib_cursor_open_index_using_name(
+                crsr.getValue(), indexName, indexCrsr));
 
         return new Cursor(indexCrsr, table, table.getIndexDefs().get(indexName));
     }
@@ -107,10 +107,14 @@ public class Cursor {
         HailDB.ib_cursor_set_cluster_access(crsr.getValue());
     }
 
+    public void setMatchMode(MatchMode matchMode) {
+        HailDB.ib_cursor_set_match_mode(crsr.getValue(), matchMode.getCode());
+    }
+
     public SearchResultCode find(Tuple tupl, SearchMode searchMode) {
         IntBuffer result = ByteBuffer.allocateDirect(4).asIntBuffer();
-        err = HailDB.ib_cursor_moveto(crsr.getValue(), tupl.tupl, searchMode
-                .getCode(), result);
+        err = HailDB.ib_cursor_moveto(crsr.getValue(), tupl.tupl,
+                searchMode.getCode(), result);
 
         assertCursorState(err);
 
@@ -160,13 +164,13 @@ public class Cursor {
     }
 
     public void lock(LockMode mode) {
-        Util.assertSuccess(HailDB.ib_cursor_lock(crsr.getValue(), mode
-                .getCode()));
+        Util.assertSuccess(HailDB.ib_cursor_lock(crsr.getValue(),
+                mode.getCode()));
     }
 
     public void setLockMode(LockMode mode) {
-        Util.assertSuccess(HailDB.ib_cursor_set_lock_mode(crsr.getValue(), mode
-                .getCode()));
+        Util.assertSuccess(HailDB.ib_cursor_set_lock_mode(crsr.getValue(),
+                mode.getCode()));
     }
 
     public void insertRow(Tuple tupl, TupleBuilder tuple) {
@@ -182,7 +186,7 @@ public class Cursor {
                 Object val = values.get(i);
                 ColumnDef def = colDefs.get(i);
 
-                setValue(tupl, def, i, val);
+                setValue(tupl, def, i, val, false);
             }
 
             Util.assertSuccess(HailDB.ib_cursor_insert_row(crsr.getValue(),
@@ -210,7 +214,7 @@ public class Cursor {
                 Object val = values.get(i);
                 ColumnDef def = colDefs.get(i);
 
-                setValue(newTuple, def, i, val);
+                setValue(newTuple, def, i, val, false);
             }
 
             Util.assertSuccess(HailDB.ib_cursor_update_row(crsr.getValue(),
@@ -221,9 +225,11 @@ public class Cursor {
         }
     }
 
-    private static void setValue(Tuple tupl, ColumnDef colDef, int i, Object val) {
+    private static void setValue(Tuple tupl, ColumnDef colDef, int i,
+            Object val, boolean ignoreNull) {
         if (val == null) {
-            if (colDef.getAttrs().contains(ColumnAttribute.NOT_NULL)) {
+            if (!ignoreNull
+                    && colDef.getAttrs().contains(ColumnAttribute.NOT_NULL)) {
                 throw new IllegalArgumentException(
                         "Cannot store null in non-null column: "
                                 + colDef.getName());

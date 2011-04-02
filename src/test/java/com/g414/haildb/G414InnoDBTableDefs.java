@@ -1,11 +1,5 @@
 package com.g414.haildb;
 
-import com.g414.haildb.ColumnAttribute;
-import com.g414.haildb.ColumnType;
-import com.g414.haildb.Database;
-import com.g414.haildb.TableBuilder;
-import com.g414.haildb.TableDef;
-
 public class G414InnoDBTableDefs {
     public static final String SCHEMA_NAME = "foo";
 
@@ -14,6 +8,9 @@ public class G414InnoDBTableDefs {
 
     public static final String TABLE_2_NAME = "foo/vtest";
     public static final TableDef TABLE_2;
+
+    public static final String TABLE_3_NAME = "foo/buz";
+    public static final TableDef TABLE_3;
 
     static {
         TableBuilder b1 = new TableBuilder(TABLE_1_NAME);
@@ -42,6 +39,18 @@ public class G414InnoDBTableDefs {
         b2.addIndex("PRIMARY", "version_", 0, true, true);
 
         TABLE_2 = b2.build();
+
+        TableBuilder b3 = new TableBuilder(TABLE_3_NAME);
+        b3.addColumn("a", ColumnType.INT, 4, ColumnAttribute.NOT_NULL);
+        b3.addColumn("b", ColumnType.INT, 4, ColumnAttribute.NOT_NULL);
+        b3.addColumn("c", ColumnType.INT, 4, ColumnAttribute.NOT_NULL);
+        b3.addColumn("d", ColumnType.INT, 4, ColumnAttribute.NOT_NULL);
+
+        b3.addIndex("PRIMARY", "a", 0, true, true);
+        b3.addIndex("PRIMARY", "b", 0, true, true);
+        b3.addIndex("PRIMARY", "c", 0, true, true);
+
+        TABLE_3 = b3.build();
     }
 
     public static void createTables(Database d) {
@@ -56,5 +65,17 @@ public class G414InnoDBTableDefs {
             System.out.println("Created table: "
                     + G414InnoDBTableDefs.TABLE_2_NAME);
         }
+
+        if (!d.tableExists(G414InnoDBTableDefs.TABLE_3)) {
+            d.createTable(G414InnoDBTableDefs.TABLE_3);
+            System.out.println("Created table: "
+                    + G414InnoDBTableDefs.TABLE_3_NAME);
+        }
+    }
+
+    public static void clearTables(Database d) {
+        d.truncateTable(TABLE_1);
+        d.truncateTable(TABLE_2);
+        d.truncateTable(TABLE_3);
     }
 }

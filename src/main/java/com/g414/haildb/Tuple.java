@@ -1,6 +1,7 @@
 package com.g414.haildb;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,7 @@ public class Tuple {
             values.add(getValue(def));
         }
 
-        return values;
+        return Collections.unmodifiableList(values);
     }
 
     public Map<String, Object> valueMap() {
@@ -46,7 +47,7 @@ public class Tuple {
             values.put(def.getName(), this.getValue(def));
         }
 
-        return values;
+        return Collections.unmodifiableMap(values);
     }
 
     public byte[] getBytes(int i) {
@@ -100,8 +101,8 @@ public class Tuple {
                     + def.getName() + ", not integer type: " + i);
         }
 
-        return TupleStorage.loadInteger(this, i, def.getLength(), !def
-                .is(ColumnAttribute.UNSIGNED));
+        return TupleStorage.loadInteger(this, i, def.getLength(),
+                !def.is(ColumnAttribute.UNSIGNED));
     }
 
     public void clear() {
@@ -134,9 +135,9 @@ public class Tuple {
         case VARCHAR_ANYCHARSET:
             return TupleStorage.loadString(this, def.getIndex());
         case INT:
-            return TupleStorage.loadInteger(this, def.getIndex(), def
-                    .getLength(), !def.getAttrs().contains(
-                    ColumnAttribute.UNSIGNED));
+            return TupleStorage.loadInteger(this, def.getIndex(),
+                    def.getLength(),
+                    !def.getAttrs().contains(ColumnAttribute.UNSIGNED));
         default:
             throw new IllegalArgumentException("unsupported datatype: "
                     + def.getType());

@@ -15,6 +15,12 @@ public enum SearchResultCode {
     }
 
     public static SearchResultCode fromCode(int code) {
-        return SearchResultCode.values()[code + 1];
+        if (code == 0) {
+            return EQUALS;
+        } else if (code > 0) {
+            return AFTER;
+        } else {
+            return BEFORE;
+        }
     }
 }

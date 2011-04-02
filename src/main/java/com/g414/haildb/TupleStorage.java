@@ -8,6 +8,7 @@ import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.nio.ShortBuffer;
+import java.util.Arrays;
 
 import com.g414.haildb.impl.jna.HailDB;
 import com.sun.jna.Memory;
@@ -48,6 +49,36 @@ public class TupleStorage {
         }
 
         return toReturn;
+    }
+
+    public static boolean areEqual(Object a, Object b, ColumnType type) {
+        if (a == null && b == null) {
+            return true;
+        }
+
+        if ((a != null && b == null) || (a == null && b != null)) {
+            return false;
+        }
+
+        switch (type) {
+        case BLOB:
+        case BINARY:
+        case VARBINARY:
+            return Arrays.equals((byte[]) a, (byte[]) b);
+        case CHAR:
+        case CHAR_ANYCHARSET:
+        case VARCHAR:
+        case VARCHAR_ANYCHARSET:
+            return a.equals(b);
+        case INT:
+        case FLOAT:
+        case DOUBLE:
+            return ((Number) a).equals((Number) b);
+        case DECIMAL:
+            return a.toString().equals(b.toString());
+        default:
+            throw new IllegalArgumentException("Unsupported Type: " + type);
+        }
     }
 
     public static Number loadInteger(Tuple tupl, int i, int length,
@@ -95,20 +126,20 @@ public class TupleStorage {
             Number numVal) {
         switch (colDef.getLength()) {
         case 1:
-            Util.assertSuccess(HailDB.ib_tuple_write_u8(tupl.tupl, i, numVal
-                    .byteValue()));
+            Util.assertSuccess(HailDB.ib_tuple_write_u8(tupl.tupl, i,
+                    numVal.byteValue()));
             break;
         case 2:
-            Util.assertSuccess(HailDB.ib_tuple_write_u16(tupl.tupl, i, numVal
-                    .shortValue()));
+            Util.assertSuccess(HailDB.ib_tuple_write_u16(tupl.tupl, i,
+                    numVal.shortValue()));
             break;
         case 4:
-            Util.assertSuccess(HailDB.ib_tuple_write_u32(tupl.tupl, i, numVal
-                    .intValue()));
+            Util.assertSuccess(HailDB.ib_tuple_write_u32(tupl.tupl, i,
+                    numVal.intValue()));
             break;
         case 8:
-            Util.assertSuccess(HailDB.ib_tuple_write_u64(tupl.tupl, i, numVal
-                    .longValue()));
+            Util.assertSuccess(HailDB.ib_tuple_write_u64(tupl.tupl, i,
+                    numVal.longValue()));
             break;
         default:
             throw new IllegalArgumentException(
@@ -118,8 +149,8 @@ public class TupleStorage {
     }
 
     public static void storeBytes(Tuple tupl, int i, byte[] val) {
-        Util.assertSuccess(HailDB.ib_col_set_value(tupl.tupl, i, TupleStorage
-                .getDirectMemoryBytes(val), val.length));
+        Util.assertSuccess(HailDB.ib_col_set_value(tupl.tupl, i,
+                TupleStorage.getDirectMemoryBytes(val), val.length));
     }
 
     public static byte[] loadBytes(Tuple tupl, int index) {

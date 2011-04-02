@@ -953,11 +953,15 @@ public class HailDB implements Library {
     public static native int ib_cfg_set(String name, Pointer value);
 
     public static int ib_cfg_set(String name, String value) {
-        return HailDB.ib_cfg_set(name, TupleStorage.getDirectMemoryString(value
-                .getBytes()));
+        return HailDB.ib_cfg_set(name,
+                TupleStorage.getDirectMemoryString(value.getBytes()));
     }
 
     public static int ib_cfg_set(String name, int value) {
+        return HailDB.ib_cfg_set(name, Pointer.createConstant(value));
+    }
+
+    public static int ib_cfg_set(String name, long value) {
         return HailDB.ib_cfg_set(name, Pointer.createConstant(value));
     }
 
@@ -1029,7 +1033,7 @@ public class HailDB implements Library {
     public static final class ib_client_compare {
         private static Pointer ib_client_compare;
 
-        public static synchronized Pointer get() {
+        public static Pointer get() {
             if (ib_client_compare == null)
                 ib_client_compare = com.g414.haildb.impl.jna.HailDB.JNA_NATIVE_LIB
                         .getGlobalVariableAddress("ib_client_compare");

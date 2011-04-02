@@ -1,9 +1,7 @@
 package com.g414.haildb.tpl;
 
-import java.util.List;
 import java.util.Map;
 
-import com.g414.haildb.ColumnDef;
 import com.g414.haildb.Cursor;
 import com.g414.haildb.Database;
 import com.g414.haildb.IndexDef;
@@ -14,9 +12,12 @@ import com.g414.haildb.Transaction;
 import com.g414.haildb.TransactionLevel;
 import com.g414.haildb.Tuple;
 import com.g414.haildb.TupleBuilder;
-import com.g414.haildb.TupleBuilder.Options;
 
 public class DatabaseTemplate {
+    public interface TransactionCallback<T> {
+        public T inTransaction(Transaction txn);
+    }
+
     protected final Database database;
 
     public DatabaseTemplate(Database database) {
@@ -49,11 +50,9 @@ public class DatabaseTemplate {
         Tuple toReturn = null;
         try {
             c = txn.openTable(def);
-            c.setLockMode(LockMode.INTENTION_EXCLUSIVE);
-            c.lock(LockMode.LOCK_EXCLUSIVE);
 
-            TupleBuilder tpl = createTupleBuilder(def, primary.getColumns(),
-                    data);
+            TupleBuilder tpl = KeyHelper.createTupleBuilder(def,
+                    primary.getColumns(), data);
 
             toFind = c.createClusteredIndexSearchTuple(tpl);
             c.find(toFind, SearchMode.GE);
@@ -64,7 +63,7 @@ public class DatabaseTemplate {
 
                 Map<String, Object> found = toReturn.valueMap();
 
-                if (!matchesPrimaryKey(primary, data, found)) {
+                if (!KeyHelper.matchesPrimaryKey(primary, data, found)) {
                     return null;
                 }
             } else {
@@ -99,7 +98,7 @@ public class DatabaseTemplate {
             c.lock(LockMode.LOCK_EXCLUSIVE);
 
             toInsert = c.createClusteredIndexReadTuple();
-            TupleBuilder tpl = createTupleBuilder(def, data);
+            TupleBuilder tpl = KeyHelper.createTupleBuilder(def, data);
             c.insertRow(toInsert, tpl);
             toInsert.clear();
         } finally {
@@ -124,8 +123,8 @@ public class DatabaseTemplate {
             c.setLockMode(LockMode.INTENTION_EXCLUSIVE);
             c.lock(LockMode.LOCK_EXCLUSIVE);
 
-            TupleBuilder tpl = createTupleBuilder(def, primary.getColumns(),
-                    data);
+            TupleBuilder tpl = KeyHelper.createTupleBuilder(def,
+                    primary.getColumns(), data);
 
             toFind = c.createClusteredIndexSearchTuple(tpl);
             c.find(toFind, SearchMode.GE);
@@ -135,17 +134,18 @@ public class DatabaseTemplate {
                 c.readRow(toUpdate);
 
                 Map<String, Object> found = toUpdate.valueMap();
-                if (!matchesPrimaryKey(primary, data, found)) {
+
+                if (!KeyHelper.matchesPrimaryKey(primary, data, found)) {
                     return false;
                 }
             } else {
                 return false;
             }
 
-            TupleBuilder val = createTupleBuilder(def, data);
-
+            TupleBuilder val = KeyHelper.createTupleBuilder(def, data);
             c.updateRow(toUpdate, val);
             toUpdate.clear();
+
             return true;
         } finally {
             if (toUpdate != null) {
@@ -175,9 +175,9 @@ public class DatabaseTemplate {
             c.setLockMode(LockMode.INTENTION_EXCLUSIVE);
             c.lock(LockMode.LOCK_EXCLUSIVE);
 
-            TupleBuilder val = createTupleBuilder(def, data);
-            TupleBuilder tpl = createTupleBuilder(def, primary.getColumns(),
-                    data);
+            TupleBuilder val = KeyHelper.createTupleBuilder(def, data);
+            TupleBuilder tpl = KeyHelper.createTupleBuilder(def,
+                    primary.getColumns(), data);
 
             toFind = c.createClusteredIndexSearchTuple(tpl);
             c.find(toFind, SearchMode.GE);
@@ -188,9 +188,10 @@ public class DatabaseTemplate {
 
                 Map<String, Object> found = toUpdate.valueMap();
 
-                if (matchesPrimaryKey(primary, data, found)) {
+                if (KeyHelper.matchesPrimaryKey(primary, data, found)) {
                     c.updateRow(toUpdate, val);
                     toUpdate.clear();
+
                     return true;
                 }
             }
@@ -230,8 +231,8 @@ public class DatabaseTemplate {
             c.setLockMode(LockMode.INTENTION_EXCLUSIVE);
             c.lock(LockMode.LOCK_EXCLUSIVE);
 
-            TupleBuilder tpl = createTupleBuilder(def, primary.getColumns(),
-                    data);
+            TupleBuilder tpl = KeyHelper.createTupleBuilder(def,
+                    primary.getColumns(), data);
 
             toFind = c.createClusteredIndexSearchTuple(tpl);
             c.find(toFind, SearchMode.GE);
@@ -241,7 +242,7 @@ public class DatabaseTemplate {
                 c.readRow(toDelete);
 
                 Map<String, Object> found = toDelete.valueMap();
-                if (matchesPrimaryKey(primary, data, found)) {
+                if (KeyHelper.matchesPrimaryKey(primary, data, found)) {
                     c.deleteRow();
                     toDelete.clear();
                     return true;
@@ -262,40 +263,5 @@ public class DatabaseTemplate {
                 c.close();
             }
         }
-    }
-
-    private static boolean matchesPrimaryKey(IndexDef primary,
-            Map<String, Object> toFind, Map<String, Object> found) {
-        for (ColumnDef col : primary.getColumns()) {
-            String colName = col.getName();
-            Object seekVal = toFind.get(colName);
-            Object foundVal = found.get(colName);
-
-            if ((seekVal == null && foundVal != null)
-                    || (seekVal != null && !seekVal.equals(foundVal.toString()))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static TupleBuilder createTupleBuilder(TableDef table,
-            Map<String, Object> data) {
-        TupleBuilder tpl = new TupleBuilder(table, Options.COERCE);
-        for (ColumnDef col : table.getColDefs()) {
-            tpl.addValue(data.get(col.getName()));
-        }
-
-        return tpl;
-    }
-
-    private static TupleBuilder createTupleBuilder(TableDef table,
-            List<ColumnDef> defs, Map<String, Object> data) {
-        TupleBuilder tpl = new TupleBuilder(table, Options.COERCE);
-        for (ColumnDef col : defs) {
-            tpl.addValue(data.get(col.getName()));
-        }
-
-        return tpl;
     }
 }
