@@ -19,6 +19,7 @@ import com.g414.haildb.tpl.Functional.Mapping;
 import com.g414.haildb.tpl.Functional.Mutation;
 import com.g414.haildb.tpl.Functional.MutationType;
 import com.g414.haildb.tpl.Functional.Reduction;
+import com.g414.haildb.tpl.Functional.Target;
 
 @Test
 public class FunctionalTest {
@@ -36,7 +37,7 @@ public class FunctionalTest {
         G414InnoDBTableDefs.clearTables(db);
     }
 
-    public void testStuff() throws Exception {
+    public void testPrimaryIndex() throws Exception {
         populate();
 
         final Map<String, Object> primary = new HashMap<String, Object>();
@@ -68,8 +69,9 @@ public class FunctionalTest {
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
                     public Void inTransaction(Transaction txn) {
-                        Functional.foreach(txn, G414InnoDBTableDefs.TABLE_3,
-                                primary, primaryFilter, filter, m);
+                        Functional.foreach(txn, new Target(
+                                G414InnoDBTableDefs.TABLE_3), primary,
+                                primaryFilter, filter, m);
 
                         return null;
                     }
@@ -82,7 +84,8 @@ public class FunctionalTest {
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
                     public Void inTransaction(Transaction txn) {
-                        Functional.map(txn, G414InnoDBTableDefs.TABLE_3,
+                        Functional.map(txn,
+                                new Target(G414InnoDBTableDefs.TABLE_3),
                                 primary, primaryFilter, filter, m)
                                 .traverseAll();
 
@@ -104,8 +107,8 @@ public class FunctionalTest {
                 new TransactionCallback<Integer>() {
                     @Override
                     public Integer inTransaction(Transaction txn) {
-                        return Functional.reduce(txn,
-                                G414InnoDBTableDefs.TABLE_3, primary,
+                        return Functional.reduce(txn, new Target(
+                                G414InnoDBTableDefs.TABLE_3), primary,
                                 primaryFilter, filter, r, sum);
                     }
                 });
@@ -128,7 +131,8 @@ public class FunctionalTest {
                 new TransactionCallback<Void>() {
                     @Override
                     public Void inTransaction(Transaction txn) {
-                        Functional.apply(txn, G414InnoDBTableDefs.TABLE_3, dt,
+                        Functional.apply(txn,
+                                new Target(G414InnoDBTableDefs.TABLE_3), dt,
                                 primary, primaryFilter, filter, a)
                                 .traverseAll();
 
@@ -142,13 +146,131 @@ public class FunctionalTest {
                 new TransactionCallback<Integer>() {
                     @Override
                     public Integer inTransaction(Transaction txn) {
-                        return Functional.reduce(txn,
-                                G414InnoDBTableDefs.TABLE_3, primary,
+                        return Functional.reduce(txn, new Target(
+                                G414InnoDBTableDefs.TABLE_3), primary,
                                 primaryFilter, filter, r, sum2);
                     }
                 });
 
         Assert.assertEquals(24, val2.intValue());
+    }
+
+    public void testSecondaryIndex() throws Exception {
+        populate();
+
+        final Map<String, Object> primary = new HashMap<String, Object>();
+        primary.put("b", 1);
+
+        final Filter primaryFilter = new Filter() {
+            public Boolean map(Map<String, Object> row) {
+                return ((Number) row.get("b")).intValue() == 1;
+            }
+        };
+
+        final Filter filter = new Filter() {
+            public Boolean map(Map<String, Object> row) {
+                return ((Number) row.get("b")).intValue() % 2 == 1
+                        && ((Number) row.get("a")).intValue() % 2 == 0;
+            }
+        };
+
+        final AtomicLong found = new AtomicLong();
+
+        final Mapping<Void> m = new Mapping<Void>() {
+            public Void map(Map<String, Object> row) {
+                found.getAndIncrement();
+
+                return null;
+            };
+        };
+
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    public Void inTransaction(Transaction txn) {
+                        Functional.foreach(txn, new Target(
+                                G414InnoDBTableDefs.TABLE_3, "bc"), primary,
+                                primaryFilter, null, m);
+
+                        return null;
+                    }
+                });
+
+        Assert.assertEquals(36, found.get());
+
+        found.set(0);
+
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    public Void inTransaction(Transaction txn) {
+                        Functional.map(txn,
+                                new Target(G414InnoDBTableDefs.TABLE_3, "bc"),
+                                primary, primaryFilter, filter, m)
+                                .traverseAll();
+
+                        return null;
+                    }
+                });
+
+        Assert.assertEquals(18, found.get());
+
+        final Reduction<Integer> r = new Reduction<Integer>() {
+            public Integer reduce(Map<String, Object> row, Integer initial) {
+                return initial + ((Number) row.get("d")).intValue();
+            }
+        };
+
+        final Integer sum = 0;
+
+        Integer val = dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Integer>() {
+                    @Override
+                    public Integer inTransaction(Transaction txn) {
+                        return Functional.reduce(txn, new Target(
+                                G414InnoDBTableDefs.TABLE_3, "bc"), primary,
+                                primaryFilter, filter, r, sum);
+                    }
+                });
+
+        Assert.assertEquals(45, val.intValue());
+
+        final Mapping<Mutation> a = new Mapping<Mutation>() {
+            public Mutation map(Map<String, Object> row) {
+                int d = ((Number) row.get("d")).intValue();
+
+                Map<String, Object> newMap = new LinkedHashMap<String, Object>();
+                newMap.putAll(row);
+                newMap.put("d", d * 2);
+
+                return new Mutation(MutationType.INSERT_OR_UPDATE, newMap);
+            };
+        };
+
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Functional.apply(txn,
+                                new Target(G414InnoDBTableDefs.TABLE_3, "bc"),
+                                dt, primary, primaryFilter, filter, a)
+                                .traverseAll();
+
+                        return null;
+                    }
+                });
+
+        final Integer sum2 = 0;
+
+        final Integer val2 = dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Integer>() {
+                    @Override
+                    public Integer inTransaction(Transaction txn) {
+                        return Functional.reduce(txn, new Target(
+                                G414InnoDBTableDefs.TABLE_3, "bc"), primary,
+                                primaryFilter, filter, r, sum2);
+                    }
+                });
+
+        Assert.assertEquals(90, val2.intValue());
     }
 
     private void populate() throws Exception {

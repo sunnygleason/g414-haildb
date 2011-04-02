@@ -51,4 +51,8 @@ public class TableDef {
     public IndexDef getPrimaryIndex() {
         return primaryIndex;
     }
+
+    public IndexDef getIndexDef(String index) {
+        return indexDefs.get(index);
+    }
 }

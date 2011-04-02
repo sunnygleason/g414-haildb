@@ -10,6 +10,7 @@ import com.g414.haildb.SearchMode;
 import com.g414.haildb.TableDef;
 import com.g414.haildb.Transaction;
 import com.g414.haildb.TransactionLevel;
+import com.g414.haildb.TransactionState;
 import com.g414.haildb.Tuple;
 import com.g414.haildb.TupleBuilder;
 
@@ -26,17 +27,30 @@ public class DatabaseTemplate {
 
     public <T> T inTransaction(TransactionLevel level,
             TransactionCallback<T> callback) throws Exception {
-        Transaction txn = database.beginTransaction(level);
+        Transaction txn = null;
         try {
+            txn = database.beginTransaction(level);
+
             return callback.inTransaction(txn);
         } catch (Exception e) {
-            txn.rollback();
-            txn = null;
+            if (txn != null) {
+                if (txn.getState().equals(TransactionState.NOT_STARTED)) {
+                    txn.release();
+                } else {
+                    txn.rollback();
+                }
+
+                txn = null;
+            }
 
             throw e;
         } finally {
             if (txn != null) {
-                txn.commit();
+                if (txn.getState().equals(TransactionState.NOT_STARTED)) {
+                    txn.release();
+                } else {
+                    txn.commit();
+                }
             }
         }
 

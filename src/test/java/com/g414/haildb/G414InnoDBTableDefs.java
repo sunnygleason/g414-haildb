@@ -50,6 +50,9 @@ public class G414InnoDBTableDefs {
         b3.addIndex("PRIMARY", "b", 0, true, true);
         b3.addIndex("PRIMARY", "c", 0, true, true);
 
+        b3.addIndex("bc", "b", 0, false, false);
+        b3.addIndex("bc", "c", 0, false, false);
+
         TABLE_3 = b3.build();
     }
 

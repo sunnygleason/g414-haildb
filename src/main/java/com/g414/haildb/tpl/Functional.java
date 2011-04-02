@@ -21,8 +21,34 @@ public class Functional {
         public void close();
     }
 
+    public enum TraversalMode {
+        READ_ONLY, READ_WRITE;
+    }
+
     public enum MutationType {
         NONE, INSERT_OR_UPDATE, DELETE;
+    }
+
+    public static class Target {
+        private final TableDef tableDef;
+        private final String indexDef;
+
+        public Target(TableDef tableDef) {
+            this(tableDef, null);
+        }
+
+        public Target(TableDef tableDef, String indexDef) {
+            this.tableDef = tableDef;
+            this.indexDef = indexDef;
+        }
+
+        public TableDef getTableDef() {
+            return tableDef;
+        }
+
+        public String getIndexDef() {
+            return indexDef;
+        }
     }
 
     public static class Mutation {
@@ -54,102 +80,26 @@ public class Functional {
     public interface Filter extends Mapping<Boolean> {
     }
 
-    public static <T> void foreach(final Transaction txn,
-            final TableDef tableDef, final Map<String, Object> firstKey,
-            final Filter primaryFilter, final Filter filter, final Mapping<T> r) {
-        Traversal<T> iter = map(txn, tableDef, firstKey, primaryFilter, filter,
-                r);
-        iter.traverseAll();
+    public static <T> void foreach(final Transaction txn, final Target target,
+            final Map<String, Object> firstKey, final Filter primaryFilter,
+            final Filter filter, final Mapping<T> r) {
+        map(txn, target, firstKey, primaryFilter, filter, r).traverseAll();
     }
 
     public static <T> Traversal<T> map(final Transaction txn,
-            final TableDef tableDef, final Map<String, Object> firstKey,
-            final Filter primaryFilter, final Filter filter, final Mapping<T> r) {
-
-        return new Traversal<T>() {
-            Cursor c = txn.openTable(tableDef);
-            IndexDef primary = tableDef.getPrimaryIndex();
-
-            {
-                TupleBuilder tpl = KeyHelper.createTupleBuilder(tableDef,
-                        primary.getColumns(), firstKey);
-
-                Tuple tuple = c.createClusteredIndexSearchTuple(tpl);
-                c.find(tuple, SearchMode.GE);
-            }
-
-            Map<String, Object> nextItem = advance();
-
-            private Map<String, Object> advance() {
-                Map<String, Object> toReturn = null;
-                while (c.isPositioned() && c.hasNext()) {
-                    Tuple read = c.createClusteredIndexReadTuple();
-                    try {
-                        c.readRow(read);
-                        Map<String, Object> row = read.valueMap();
-
-                        if (!primaryFilter.map(row)) {
-                            close();
-                            break;
-                        }
-
-                        if (filter == null || filter.map(row)) {
-                            toReturn = row;
-                            break;
-                        }
-                    } finally {
-                        read.delete();
-                        if (c != null) {
-                            c.next();
-                        }
-                    }
-                }
-
-                return toReturn;
-            }
-
-            @Override
-            public boolean hasNext() {
-                return nextItem != null;
-            }
-
-            public T next() {
-                Map<String, Object> orig = nextItem;
-
-                nextItem = advance();
-
-                return r.map(orig);
-            }
-
-            @Override
-            public void close() {
-                if (c != null) {
-                    c.close();
-                    c = null;
-                }
-            }
-
-            @Override
-            public void traverseAll() {
-                while (hasNext()) {
-                    next();
-                }
-
-                close();
-            }
-
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
-        };
+            final Target target, final Map<String, Object> firstKey,
+            final Filter primaryFilter, final Filter filter,
+            final Mapping<T> mapping) {
+        return new TraversalImpl<T>(txn, target, TraversalMode.READ_ONLY,
+                firstKey, primaryFilter, filter, mapping);
     }
 
-    public static <T> T reduce(final Transaction txn, final TableDef tableDef,
+    public static <T> T reduce(final Transaction txn, final Target target,
             final Map<String, Object> firstKey, final Filter primaryFilter,
-            final Filter filter, final Reduction<T> r, final T initial) {
+            final Filter filter, final Reduction<T> reduction, final T initial) {
 
-        MapReduction<T> mr = new MapReduction<T>(initial, r);
-        Traversal<T> iter = map(txn, tableDef, firstKey, primaryFilter, filter,
+        MapReduction<T> mr = new MapReduction<T>(initial, reduction);
+        Traversal<T> iter = map(txn, target, firstKey, primaryFilter, filter,
                 mr);
         try {
             while (iter.hasNext()) {
@@ -164,81 +114,24 @@ public class Functional {
     }
 
     public static Traversal<Mutation> apply(final Transaction txn,
-            final TableDef tableDef, final DatabaseTemplate dbt,
+            final Target target, final DatabaseTemplate dbt,
             final Map<String, Object> firstKey, final Filter primaryFilter,
-            final Filter filter, final Mapping<Mutation> r) {
+            final Filter filter, final Mapping<Mutation> mutation) {
 
-        return new Traversal<Mutation>() {
-            IndexDef primary = tableDef.getPrimaryIndex();
-            Cursor c = txn.openTable(tableDef);
-
-            {
-                c.setLockMode(LockMode.INTENTION_EXCLUSIVE);
-                c.lock(LockMode.LOCK_EXCLUSIVE);
-
-                TupleBuilder tpl = KeyHelper.createTupleBuilder(tableDef,
-                        primary.getColumns(), firstKey);
-
-                Tuple tuple = c.createClusteredIndexSearchTuple(tpl);
-                c.find(tuple, SearchMode.GE);
-            }
-
-            Map<String, Object> nextItem = advance();
-
-            private Map<String, Object> advance() {
-                Map<String, Object> toReturn = null;
-                while (c.isPositioned() && c.hasNext()) {
-                    Tuple read = c.createClusteredIndexReadTuple();
-                    try {
-                        c.readRow(read);
-                        Map<String, Object> row = read.valueMap();
-
-                        if (!primaryFilter.map(row)) {
-                            try {
-                                close();
-                            } catch (Exception e) {
-                                throw new RuntimeException(e);
-                            }
-
-                            break;
-                        }
-
-                        if (filter == null || filter.map(row)) {
-                            toReturn = row;
-                            break;
-                        }
-                    } finally {
-                        read.delete();
-                        if (c != null) {
-                            c.next();
-                        }
-                    }
-                }
-
-                return toReturn;
-            }
-
+        final Mapping<Mutation> mapping = new Mapping<Functional.Mutation>() {
             @Override
-            public boolean hasNext() {
-                return nextItem != null;
-            }
-
-            @Override
-            public Mutation next() {
-                Map<String, Object> orig = nextItem;
-
-                nextItem = advance();
-
-                Mutation m = r.map(orig);
+            public Mutation map(Map<String, Object> row) {
+                Mutation m = mutation.map(row);
 
                 switch (m.getType()) {
                 case NONE:
                     break;
                 case INSERT_OR_UPDATE:
-                    dbt.insertOrUpdate(txn, tableDef, m.getInstance());
+                    dbt.insertOrUpdate(txn, target.getTableDef(),
+                            m.getInstance());
                     break;
                 case DELETE:
-                    dbt.delete(txn, tableDef, m.getInstance());
+                    dbt.delete(txn, target.getTableDef(), m.getInstance());
                     break;
                 default:
                     throw new IllegalArgumentException();
@@ -246,28 +139,11 @@ public class Functional {
 
                 return m;
             }
-
-            @Override
-            public void close() {
-                if (c != null) {
-                    c.close();
-                    c = null;
-                }
-            }
-
-            @Override
-            public void traverseAll() {
-                while (hasNext()) {
-                    next();
-                }
-
-                close();
-            }
-
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
         };
+
+        return new TraversalImpl<Mutation>(txn, target,
+                TraversalMode.READ_WRITE, firstKey, primaryFilter, filter,
+                mapping);
     }
 
     private static class MapReduction<T> implements Mapping<T> {
@@ -287,6 +163,139 @@ public class Functional {
 
         public T getAccum() {
             return accum;
+        }
+    }
+
+    private static class TraversalImpl<T> implements Traversal<T> {
+        private final boolean isSecondary;
+        private final boolean isReadOnly;
+        private final TableDef tableDef;
+        private final IndexDef indexDef;
+        private final Filter primaryFilter;
+        private final Filter filter;
+        private final Mapping<T> mapping;
+
+        private Cursor c0;
+        private Cursor c1;
+        private Map<String, Object> nextItem;
+
+        public TraversalImpl(Transaction txn, Target target,
+                TraversalMode traversalMode, Map<String, Object> firstKey,
+                Filter primaryFilter, Filter filter, Mapping<T> mapping) {
+            this.primaryFilter = primaryFilter;
+            this.filter = filter;
+            this.mapping = mapping;
+
+            this.isReadOnly = traversalMode.equals(TraversalMode.READ_ONLY);
+            this.isSecondary = target.getIndexDef() != null;
+            this.tableDef = target.getTableDef();
+            this.c0 = txn.openTable(tableDef);
+
+            if (this.isSecondary) {
+                this.c1 = c0.openIndex(target.getIndexDef());
+                this.c1.setClusterAccess();
+                this.indexDef = tableDef.getIndexDef(target.getIndexDef());
+            } else {
+                this.c1 = this.c0;
+                this.indexDef = target.getTableDef().getPrimaryIndex();
+            }
+
+            if (!this.isReadOnly) {
+                try {
+                    this.c1.setLockMode(LockMode.INTENTION_EXCLUSIVE);
+                    this.c1.lock(LockMode.LOCK_EXCLUSIVE);
+                } catch (Exception e) {
+                    this.close();
+
+                    throw new RuntimeException(e);
+                }
+            }
+
+            TupleBuilder tpl = KeyHelper.createTupleBuilder(tableDef,
+                    indexDef.getColumns(), firstKey);
+
+            Tuple tuple = isSecondary ? c1.createSecondaryIndexSearchTuple(tpl)
+                    : c1.createClusteredIndexSearchTuple(tpl);
+
+            c1.find(tuple, SearchMode.GE);
+            nextItem = advance();
+        }
+
+        private Map<String, Object> advance() {
+            Map<String, Object> toReturn = null;
+            while (c1.isPositioned() && c1.hasNext()) {
+                Tuple read = c1.createClusteredIndexReadTuple();
+                try {
+                    c1.readRow(read);
+                    Map<String, Object> row = read.valueMap();
+
+                    if (!primaryFilter.map(row)) {
+                        close();
+                        break;
+                    }
+
+                    if (filter == null || filter.map(row)) {
+                        toReturn = row;
+                        break;
+                    }
+                } catch (Exception e) {
+                    close();
+
+                    throw new RuntimeException(e);
+                } finally {
+                    read.delete();
+                    if (c1 != null) {
+                        c1.next();
+                    }
+                }
+            }
+
+            return toReturn;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return nextItem != null;
+        }
+
+        public T next() {
+            Map<String, Object> orig = nextItem;
+
+            nextItem = advance();
+
+            try {
+                return mapping.map(orig);
+            } catch (Exception e) {
+                close();
+
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public void close() {
+            if (c1 != null) {
+                c1.close();
+                c1 = null;
+            }
+
+            if (isSecondary && c0 != null) {
+                c0.close();
+                c0 = null;
+            }
+        }
+
+        @Override
+        public void traverseAll() {
+            while (hasNext()) {
+                next();
+            }
+
+            close();
+        }
+
+        public void remove() {
+            throw new UnsupportedOperationException();
         }
     }
 }
