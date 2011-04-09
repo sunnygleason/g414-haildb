@@ -2,13 +2,108 @@ package com.g414.haildb;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.List;
+import java.util.Map;
 
 import com.g414.haildb.impl.jna.HailDB;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
 
 public class Cursor {
+    public enum CursorDirection {
+        ASC, DESC;
+    }
+
+    public enum SearchMode {
+        /* see InnoDB.ib_srch_mode_t.IB_CUR_G */
+        G(HailDB.ib_srch_mode_t.IB_CUR_G), GE(HailDB.ib_srch_mode_t.IB_CUR_GE), L(
+                HailDB.ib_srch_mode_t.IB_CUR_L), LE(
+                HailDB.ib_srch_mode_t.IB_CUR_LE);
+
+        private final int code;
+
+        private SearchMode(int code) {
+            this.code = code;
+        }
+
+        public int getCode() {
+            return code;
+        }
+
+        public static SearchMode fromCode(int code) {
+            return SearchMode.values()[code - 1];
+        }
+    }
+
+    public enum MatchMode {
+        /* see InnoDB.ib_match_mode_t */
+        CLOSEST(HailDB.ib_match_mode_t.IB_CLOSEST_MATCH), EXACT(
+                HailDB.ib_match_mode_t.IB_EXACT_MATCH), EXACT_PREFIX(
+                HailDB.ib_match_mode_t.IB_EXACT_PREFIX);
+
+        private final int code;
+
+        private MatchMode(int code) {
+            this.code = code;
+        }
+
+        public int getCode() {
+            return code;
+        }
+
+        public static MatchMode fromCode(int code) {
+            return MatchMode.values()[code];
+        }
+    }
+
+    public enum SearchResultCode {
+        /* returns -1, 0 or 1 based on search result */
+        BEFORE(0), EQUALS(1), AFTER(2);
+
+        private final int code;
+
+        private SearchResultCode(int code) {
+            this.code = code;
+        }
+
+        public int getCode() {
+            return code - 1;
+        }
+
+        public static SearchResultCode fromCode(int code) {
+            if (code == 0) {
+                return EQUALS;
+            } else if (code > 0) {
+                return AFTER;
+            } else {
+                return BEFORE;
+            }
+        }
+    }
+
+    public enum LockMode {
+        /* see InnoDB.ib_lck_mode_t */
+        INTENTION_SHARED(HailDB.ib_lck_mode_t.IB_LOCK_IS), INTENTION_EXCLUSIVE(
+                HailDB.ib_lck_mode_t.IB_LOCK_IX), LOCK_SHARED(
+                HailDB.ib_lck_mode_t.IB_LOCK_S), LOCK_EXCLUSIVE(
+                HailDB.ib_lck_mode_t.IB_LOCK_X), NOT_USED(
+                HailDB.ib_lck_mode_t.IB_LOCK_NOT_USED), NONE(
+                HailDB.ib_lck_mode_t.IB_LOCK_NONE);
+
+        private final int code;
+
+        private LockMode(int code) {
+            this.code = code;
+        }
+
+        public int getCode() {
+            return code;
+        }
+
+        public static LockMode fromCode(int code) {
+            return LockMode.values()[code];
+        }
+    }
+
     private final PointerByReference crsr;
     private final TableDef table;
     private final IndexDef index;
@@ -35,7 +130,7 @@ public class Cursor {
                 table.getColDefs());
     }
 
-    public Tuple createClusteredIndexSearchTuple(TupleBuilder tuple) {
+    public Tuple createClusteredIndexSearchTuple(Map<String, Object> val) {
         if (this.index != null) {
             throw new IllegalArgumentException(
                     "Secondary index cursor may not create cluster search tuples");
@@ -44,12 +139,10 @@ public class Cursor {
         Tuple searchTuple = new Tuple(HailDB.ib_clust_search_tuple_create(crsr
                 .getValue()), table.getColDefs());
 
-        List<Object> values = tuple.getValues();
-
-        for (int i = 0; i < tuple.getSize(); i++) {
-            Object value = values.get(i);
-            ColumnDef colDef = table.getColDefs().get(i);
-            setValue(searchTuple, colDef, i, value, true);
+        for (int i = 0; i < table.getPrimaryIndex().getColumns().size(); i++) {
+            ColumnDef colDef = table.getPrimaryIndex().getColumns().get(i);
+            Object value = val.get(colDef.getName());
+            setValue(searchTuple, colDef, i, value, true, true);
         }
 
         return searchTuple;
@@ -65,7 +158,7 @@ public class Cursor {
                 index.getColumns());
     }
 
-    public Tuple createSecondaryIndexSearchTuple(TupleBuilder tuple) {
+    public Tuple createSecondaryIndexSearchTuple(Map<String, Object> val) {
         if (this.index == null) {
             throw new IllegalArgumentException(
                     "Clustered index cursor may not create secondary index search tuples");
@@ -74,12 +167,11 @@ public class Cursor {
         Tuple searchTuple = new Tuple(HailDB.ib_sec_search_tuple_create(crsr
                 .getValue()), index.getColumns());
 
-        List<Object> values = tuple.getValues();
-
-        for (int i = 0; i < tuple.getSize(); i++) {
-            Object value = values.get(i);
+        for (int i = 0; i < index.getColumns().size(); i++) {
             ColumnDef colDef = index.getColumns().get(i);
-            setValue(searchTuple, colDef, i, value, true);
+            Object value = val.get(colDef.getName());
+
+            setValue(searchTuple, colDef, i, value, true, true);
         }
 
         return searchTuple;
@@ -173,20 +265,17 @@ public class Cursor {
                 mode.getCode()));
     }
 
-    public void insertRow(Tuple tupl, TupleBuilder tuple) {
-        List<Object> values = tuple.getValues();
-        List<ColumnDef> colDefs = tuple.getColumnDefs();
-
-        if (values.size() != tupl.columns.size()) {
+    public void insertRow(Tuple tupl, Map<String, Object> data) {
+        if (data.size() != tupl.columns.size()) {
             throw new IllegalArgumentException("Must specify all column values");
         }
 
         try {
-            for (int i = 0; i < values.size(); i++) {
-                Object val = values.get(i);
-                ColumnDef def = colDefs.get(i);
+            for (int i = 0; i < table.getColDefs().size(); i++) {
+                ColumnDef colDef = table.getColDefs().get(i);
+                Object value = data.get(colDef.getName());
 
-                setValue(tupl, def, i, val, false);
+                setValue(tupl, colDef, i, value, false, true);
             }
 
             Util.assertSuccess(HailDB.ib_cursor_insert_row(crsr.getValue(),
@@ -196,11 +285,8 @@ public class Cursor {
         }
     }
 
-    public void updateRow(Tuple oldTuple, TupleBuilder tuple) {
-        List<Object> values = tuple.getValues();
-        List<ColumnDef> colDefs = tuple.getColumnDefs();
-
-        if (values.size() != oldTuple.columns.size()) {
+    public void updateRow(Tuple oldTuple, Map<String, Object> data) {
+        if (data.size() != oldTuple.columns.size()) {
             throw new IllegalArgumentException("Must specify all column values");
         }
 
@@ -210,11 +296,11 @@ public class Cursor {
             Util.assertSuccess(HailDB.ib_tuple_copy(newTuple.tupl,
                     oldTuple.tupl));
 
-            for (int i = 0; i < colDefs.size(); i++) {
-                Object val = values.get(i);
-                ColumnDef def = colDefs.get(i);
+            for (int i = 0; i < table.getColDefs().size(); i++) {
+                ColumnDef colDef = table.getColDefs().get(i);
+                Object value = data.get(colDef.getName());
 
-                setValue(newTuple, def, i, val, false);
+                setValue(newTuple, colDef, i, value, false, true);
             }
 
             Util.assertSuccess(HailDB.ib_cursor_update_row(crsr.getValue(),
@@ -226,7 +312,7 @@ public class Cursor {
     }
 
     private static void setValue(Tuple tupl, ColumnDef colDef, int i,
-            Object val, boolean ignoreNull) {
+            Object val, boolean ignoreNull, boolean coerce) {
         if (val == null) {
             if (!ignoreNull
                     && colDef.getAttrs().contains(ColumnAttribute.NOT_NULL)) {
@@ -238,6 +324,10 @@ public class Cursor {
                         Pointer.NULL, HailDB.IB_SQL_NULL));
             }
         } else {
+            if (val instanceof String) {
+                val = TupleStorage.coerceType((String) val, colDef.getType());
+            }
+
             switch (colDef.getType()) {
             case BINARY:
             case VARBINARY:

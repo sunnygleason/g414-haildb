@@ -11,7 +11,30 @@ import com.g414.haildb.ColumnType;
 import com.g414.haildb.Validation;
 
 @Test
-public class TestValidator {
+public class ValidatorTest {
+    public void testBinary() {
+        ColumnDef c1 = new ColumnDef(1, "c1", ColumnType.BINARY, 8);
+        Assert.assertTrue(Validation.isValid(c1, null));
+        Assert.assertTrue(Validation.isValid(c1, "a test".getBytes()));
+        Assert.assertTrue(Validation.isValid(c1, new byte[] { 0x00, 0x01, 0x02,
+                0x03 }));
+        Assert.assertTrue(!Validation.isValid(c1, "a longer test".getBytes()));
+
+        ColumnDef c2 = new ColumnDef(1, "c2", ColumnType.VARBINARY, 8);
+        Assert.assertTrue(Validation.isValid(c2, null));
+        Assert.assertTrue(Validation.isValid(c2, "a test".getBytes()));
+        Assert.assertTrue(Validation.isValid(c2, new byte[] { 0x00, 0x01, 0x02,
+                0x03 }));
+        Assert.assertTrue(!Validation.isValid(c2, "a longer test".getBytes()));
+
+        ColumnDef c3 = new ColumnDef(1, "c3", ColumnType.BLOB, 0);
+        Assert.assertTrue(Validation.isValid(c3, null));
+        Assert.assertTrue(Validation.isValid(c3, "a test".getBytes()));
+        Assert.assertTrue(Validation.isValid(c3, new byte[] { 0x00, 0x01, 0x02,
+                0x03 }));
+        Assert.assertTrue(Validation.isValid(c3, "a longer test".getBytes()));
+    }
+
     public void testChar() {
         ColumnDef c1 = new ColumnDef(1, "c1", ColumnType.CHAR, 10);
         Assert.assertTrue(Validation.isValid(c1, ""));
@@ -112,9 +135,7 @@ public class TestValidator {
         Assert.assertTrue(Validation.isValid(c1, 0));
         Assert.assertTrue(Validation.isValid(c1, Long.MAX_VALUE));
         Assert.assertTrue(Validation.isValid(c1, Long.MIN_VALUE));
-        Assert
-                .assertTrue(!Validation.isValid(c1, BigInteger.ONE
-                        .shiftLeft(64)));
+        Assert.assertTrue(!Validation.isValid(c1, BigInteger.ONE.shiftLeft(64)));
         Assert.assertTrue(!Validation.isValid(c1, BigInteger.ONE.shiftLeft(64)
                 .negate()));
 
@@ -124,9 +145,7 @@ public class TestValidator {
         Assert.assertTrue(Validation.isValid(c2, 0));
         Assert.assertTrue(Validation.isValid(c2, BigInteger.ONE.shiftLeft(64)
                 .subtract(BigInteger.ONE)));
-        Assert
-                .assertTrue(!Validation.isValid(c2, BigInteger.ONE
-                        .shiftLeft(65)));
+        Assert.assertTrue(!Validation.isValid(c2, BigInteger.ONE.shiftLeft(65)));
         Assert.assertTrue(!Validation.isValid(c2, BigInteger.ONE.shiftLeft(64)
                 .negate()));
         Assert.assertTrue(!Validation.isValid(c2, BigInteger.ONE.shiftLeft(65)

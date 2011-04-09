@@ -79,9 +79,12 @@ public class TupleStorage {
         case VARCHAR_ANYCHARSET:
             return a.equals(b);
         case INT:
+            return new BigInteger(a.toString()).equals(new BigInteger(b
+                    .toString()));
         case FLOAT:
         case DOUBLE:
-            return ((Number) a).equals((Number) b);
+            return new BigDecimal(a.toString()).equals(new BigDecimal(b
+                    .toString()));
         case DECIMAL:
             return a.toString().equals(b.toString());
         default:

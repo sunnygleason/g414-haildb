@@ -3,16 +3,15 @@ package com.g414.haildb.tpl;
 import java.util.Map;
 
 import com.g414.haildb.Cursor;
+import com.g414.haildb.Cursor.LockMode;
+import com.g414.haildb.Cursor.SearchMode;
 import com.g414.haildb.Database;
 import com.g414.haildb.IndexDef;
-import com.g414.haildb.LockMode;
-import com.g414.haildb.SearchMode;
 import com.g414.haildb.TableDef;
 import com.g414.haildb.Transaction;
-import com.g414.haildb.TransactionLevel;
-import com.g414.haildb.TransactionState;
+import com.g414.haildb.Transaction.TransactionLevel;
+import com.g414.haildb.Transaction.TransactionState;
 import com.g414.haildb.Tuple;
-import com.g414.haildb.TupleBuilder;
 
 public class DatabaseTemplate {
     public interface TransactionCallback<T> {
@@ -65,10 +64,7 @@ public class DatabaseTemplate {
         try {
             c = txn.openTable(def);
 
-            TupleBuilder tpl = KeyHelper.createTupleBuilder(def,
-                    primary.getColumns(), data);
-
-            toFind = c.createClusteredIndexSearchTuple(tpl);
+            toFind = c.createClusteredIndexSearchTuple(data);
             c.find(toFind, SearchMode.GE);
 
             if (c.isPositioned() && c.hasNext()) {
@@ -112,8 +108,7 @@ public class DatabaseTemplate {
             c.lock(LockMode.LOCK_EXCLUSIVE);
 
             toInsert = c.createClusteredIndexReadTuple();
-            TupleBuilder tpl = KeyHelper.createTupleBuilder(def, data);
-            c.insertRow(toInsert, tpl);
+            c.insertRow(toInsert, data);
             toInsert.clear();
         } finally {
             if (toInsert != null) {
@@ -137,10 +132,7 @@ public class DatabaseTemplate {
             c.setLockMode(LockMode.INTENTION_EXCLUSIVE);
             c.lock(LockMode.LOCK_EXCLUSIVE);
 
-            TupleBuilder tpl = KeyHelper.createTupleBuilder(def,
-                    primary.getColumns(), data);
-
-            toFind = c.createClusteredIndexSearchTuple(tpl);
+            toFind = c.createClusteredIndexSearchTuple(data);
             c.find(toFind, SearchMode.GE);
 
             if (c.isPositioned() && c.hasNext()) {
@@ -156,8 +148,7 @@ public class DatabaseTemplate {
                 return false;
             }
 
-            TupleBuilder val = KeyHelper.createTupleBuilder(def, data);
-            c.updateRow(toUpdate, val);
+            c.updateRow(toUpdate, data);
             toUpdate.clear();
 
             return true;
@@ -189,11 +180,7 @@ public class DatabaseTemplate {
             c.setLockMode(LockMode.INTENTION_EXCLUSIVE);
             c.lock(LockMode.LOCK_EXCLUSIVE);
 
-            TupleBuilder val = KeyHelper.createTupleBuilder(def, data);
-            TupleBuilder tpl = KeyHelper.createTupleBuilder(def,
-                    primary.getColumns(), data);
-
-            toFind = c.createClusteredIndexSearchTuple(tpl);
+            toFind = c.createClusteredIndexSearchTuple(data);
             c.find(toFind, SearchMode.GE);
 
             if (c.isPositioned() && c.hasNext()) {
@@ -203,7 +190,7 @@ public class DatabaseTemplate {
                 Map<String, Object> found = toUpdate.valueMap();
 
                 if (KeyHelper.matchesPrimaryKey(primary, data, found)) {
-                    c.updateRow(toUpdate, val);
+                    c.updateRow(toUpdate, data);
                     toUpdate.clear();
 
                     return true;
@@ -211,7 +198,7 @@ public class DatabaseTemplate {
             }
 
             toInsert = c.createClusteredIndexReadTuple();
-            c.insertRow(toInsert, val);
+            c.insertRow(toInsert, data);
             toInsert.clear();
 
             return false;
@@ -245,10 +232,7 @@ public class DatabaseTemplate {
             c.setLockMode(LockMode.INTENTION_EXCLUSIVE);
             c.lock(LockMode.LOCK_EXCLUSIVE);
 
-            TupleBuilder tpl = KeyHelper.createTupleBuilder(def,
-                    primary.getColumns(), data);
-
-            toFind = c.createClusteredIndexSearchTuple(tpl);
+            toFind = c.createClusteredIndexSearchTuple(data);
             c.find(toFind, SearchMode.GE);
 
             if (c.isPositioned() && c.hasNext()) {

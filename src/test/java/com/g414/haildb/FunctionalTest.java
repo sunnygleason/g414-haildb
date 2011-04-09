@@ -1,5 +1,6 @@
 package com.g414.haildb;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,6 +12,9 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import com.g414.haildb.Cursor.CursorDirection;
+import com.g414.haildb.Cursor.SearchMode;
+import com.g414.haildb.Transaction.TransactionLevel;
 import com.g414.haildb.tpl.DatabaseTemplate;
 import com.g414.haildb.tpl.DatabaseTemplate.TransactionCallback;
 import com.g414.haildb.tpl.Functional;
@@ -20,6 +24,8 @@ import com.g414.haildb.tpl.Functional.Mutation;
 import com.g414.haildb.tpl.Functional.MutationType;
 import com.g414.haildb.tpl.Functional.Reduction;
 import com.g414.haildb.tpl.Functional.Target;
+import com.g414.haildb.tpl.Functional.Traversal;
+import com.g414.haildb.tpl.Functional.TraversalSpec;
 
 @Test
 public class FunctionalTest {
@@ -28,13 +34,305 @@ public class FunctionalTest {
 
     @BeforeMethod(alwaysRun = true)
     public void setUp() {
-        db.createDatabase(G414InnoDBTableDefs.SCHEMA_NAME);
-        G414InnoDBTableDefs.createTables(db);
+        db.createDatabase(TableDefinitions.SCHEMA_NAME);
+        TableDefinitions.createTables(db);
     }
 
     @AfterMethod(alwaysRun = true)
     public void tearDown() {
-        G414InnoDBTableDefs.clearTables(db);
+        TableDefinitions.clearTables(db);
+    }
+
+    public void testException() throws Exception {
+        try {
+            dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                    new TransactionCallback<Void>() {
+                        @Override
+                        public Void inTransaction(Transaction txn) {
+                            throw new IllegalStateException();
+                        }
+                    });
+            throw new RuntimeException("fail");
+        } catch (IllegalStateException expected) {
+            // cool
+        }
+    }
+
+    public void testInsertDuplicateFail() throws Exception {
+        try {
+            dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                    new TransactionCallback<Void>() {
+                        @Override
+                        public Void inTransaction(Transaction txn) {
+                            Map<String, Object> p2 = new LinkedHashMap<String, Object>();
+                            p2.put("a", -1L);
+                            p2.put("b", -1L);
+                            p2.put("c", -1L);
+                            p2.put("d", -1L);
+
+                            dt.insert(txn, TableDefinitions.TABLE_3, p2);
+                            dt.insert(txn, TableDefinitions.TABLE_3, p2);
+
+                            return null;
+                        }
+                    });
+            throw new RuntimeException("fail");
+        } catch (InnoException expected) {
+            // cool
+        }
+    }
+
+    public void testInsertUpdateOK() throws Exception {
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Map<String, Object> p2 = new LinkedHashMap<String, Object>();
+                        p2.put("a", -1L);
+                        p2.put("b", -1L);
+                        p2.put("c", -1L);
+                        p2.put("d", -1L);
+
+                        dt.insert(txn, TableDefinitions.TABLE_3, p2);
+                        dt.update(txn, TableDefinitions.TABLE_3, p2);
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testUpdateInsertFail() throws Exception {
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Map<String, Object> p2 = new LinkedHashMap<String, Object>();
+                        p2.put("a", -1L);
+                        p2.put("b", -1L);
+                        p2.put("c", -1L);
+                        p2.put("d", -1L);
+
+                        Assert.assertFalse(dt.update(txn,
+                                TableDefinitions.TABLE_3, p2));
+
+                        dt.insert(txn, TableDefinitions.TABLE_3, p2);
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testInsertDeleteOK() throws Exception {
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Map<String, Object> p2 = new LinkedHashMap<String, Object>();
+                        p2.put("a", -1L);
+                        p2.put("b", -1L);
+                        p2.put("c", -1L);
+                        p2.put("d", -1L);
+
+                        dt.insert(txn, TableDefinitions.TABLE_3, p2);
+                        dt.delete(txn, TableDefinitions.TABLE_3, p2);
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testDeleteNothingOK() throws Exception {
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Map<String, Object> p2 = new LinkedHashMap<String, Object>();
+                        p2.put("a", -1L);
+                        p2.put("b", -1L);
+                        p2.put("c", -1L);
+
+                        dt.delete(txn, TableDefinitions.TABLE_3, p2);
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testDelete() throws Exception {
+        populate();
+
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Map<String, Object> p2 = new LinkedHashMap<String, Object>();
+                        p2.put("a", 0L);
+                        p2.put("b", 0L);
+                        p2.put("c", 0L);
+
+                        dt.delete(txn, TableDefinitions.TABLE_3, p2);
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testInsertOrUpdateDuplicateOK() throws Exception {
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Map<String, Object> p2 = new LinkedHashMap<String, Object>();
+                        p2.put("a", -1L);
+                        p2.put("b", -1L);
+                        p2.put("c", -1L);
+                        p2.put("d", -1L);
+
+                        dt.insertOrUpdate(txn, TableDefinitions.TABLE_3, p2);
+                        dt.insertOrUpdate(txn, TableDefinitions.TABLE_3, p2);
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testEmptyLoad() throws Exception {
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Map<String, Object> p2 = new LinkedHashMap<String, Object>();
+                        p2.put("a", -1L);
+                        p2.put("b", -1L);
+                        p2.put("c", -1L);
+
+                        Assert.assertNull(dt.load(txn,
+                                TableDefinitions.TABLE_3, p2));
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testLoad() throws Exception {
+        populate();
+
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Map<String, Object> p1 = new LinkedHashMap<String, Object>();
+                        p1.put("a", 0L);
+                        p1.put("b", 0L);
+                        p1.put("c", 0L);
+
+                        Assert.assertNotNull(dt.load(txn,
+                                TableDefinitions.TABLE_3, p1));
+
+                        Map<String, Object> p2 = new LinkedHashMap<String, Object>();
+                        p2.put("a", -1L);
+                        p2.put("b", -1L);
+                        p2.put("c", -1L);
+
+                        Assert.assertNull(dt.load(txn,
+                                TableDefinitions.TABLE_3, p2));
+
+                        Map<String, Object> p3 = new LinkedHashMap<String, Object>();
+                        p3.put("a", 0L);
+                        p3.put("b", 0L);
+                        p3.put("c", 999L);
+
+                        Assert.assertNull(dt.load(txn,
+                                TableDefinitions.TABLE_3, p3));
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testAscendingTraversal() throws Exception {
+        populate();
+
+        final Filter primaryFilter = new Filter() {
+            public Boolean map(Map<String, Object> row) {
+                return true;
+            }
+        };
+
+        final Mapping<Map<String, Object>> m = new Mapping<Map<String, Object>>() {
+            public Map<String, Object> map(Map<String, Object> row) {
+                return row;
+            };
+        };
+
+        final TraversalSpec spec = new TraversalSpec(new Target(
+                TableDefinitions.TABLE_3), null, primaryFilter, null);
+
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    public Void inTransaction(Transaction txn) {
+                        Traversal<Map<String, Object>> iter = Functional.map(
+                                txn, spec, m);
+
+                        try {
+                            Assert.assertEquals(
+                                    mapOf("a", 0, "b", 0, "c", 0, "d", 0)
+                                            .toString(), iter.next().toString());
+                            Assert.assertEquals(
+                                    mapOf("a", 0, "b", 0, "c", 1, "d", 1)
+                                            .toString(), iter.next().toString());
+                            Assert.assertEquals(
+                                    mapOf("a", 0, "b", 0, "c", 2, "d", 2)
+                                            .toString(), iter.next().toString());
+                        } finally {
+                            iter.close();
+                        }
+                        return null;
+                    }
+                });
+    }
+
+    public void testDescendingTraversal() throws Exception {
+        populate();
+
+        final Filter primaryFilter = new Filter() {
+            public Boolean map(Map<String, Object> row) {
+                return true;
+            }
+        };
+
+        final Mapping<Map<String, Object>> m = new Mapping<Map<String, Object>>() {
+            public Map<String, Object> map(Map<String, Object> row) {
+                return row;
+            };
+        };
+
+        final TraversalSpec spec = new TraversalSpec(new Target(
+                TableDefinitions.TABLE_3), CursorDirection.DESC,
+                SearchMode.LE, null, primaryFilter, null);
+
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    public Void inTransaction(Transaction txn) {
+                        Traversal<Map<String, Object>> iter = Functional.map(
+                                txn, spec, m);
+
+                        try {
+                            Assert.assertEquals(
+                                    mapOf("a", 5, "b", 1, "c", 5, "d", 5)
+                                            .toString(), iter.next().toString());
+                            Assert.assertEquals(
+                                    mapOf("a", 5, "b", 1, "c", 4, "d", 4)
+                                            .toString(), iter.next().toString());
+                            Assert.assertEquals(
+                                    mapOf("a", 5, "b", 1, "c", 3, "d", 3)
+                                            .toString(), iter.next().toString());
+                        } finally {
+                            iter.close();
+                        }
+                        return null;
+                    }
+                });
     }
 
     public void testPrimaryIndex() throws Exception {
@@ -66,12 +364,13 @@ public class FunctionalTest {
             };
         };
 
+        final TraversalSpec spec = new TraversalSpec(new Target(
+                TableDefinitions.TABLE_3), primary, primaryFilter, filter);
+
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
                     public Void inTransaction(Transaction txn) {
-                        Functional.foreach(txn, new Target(
-                                G414InnoDBTableDefs.TABLE_3), primary,
-                                primaryFilter, filter, m);
+                        Functional.foreach(txn, spec, m);
 
                         return null;
                     }
@@ -84,10 +383,7 @@ public class FunctionalTest {
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
                     public Void inTransaction(Transaction txn) {
-                        Functional.map(txn,
-                                new Target(G414InnoDBTableDefs.TABLE_3),
-                                primary, primaryFilter, filter, m)
-                                .traverseAll();
+                        Functional.map(txn, spec, m).traverseAll();
 
                         return null;
                     }
@@ -107,9 +403,7 @@ public class FunctionalTest {
                 new TransactionCallback<Integer>() {
                     @Override
                     public Integer inTransaction(Transaction txn) {
-                        return Functional.reduce(txn, new Target(
-                                G414InnoDBTableDefs.TABLE_3), primary,
-                                primaryFilter, filter, r, sum);
+                        return Functional.reduce(txn, spec, r, sum);
                     }
                 });
 
@@ -131,10 +425,7 @@ public class FunctionalTest {
                 new TransactionCallback<Void>() {
                     @Override
                     public Void inTransaction(Transaction txn) {
-                        Functional.apply(txn,
-                                new Target(G414InnoDBTableDefs.TABLE_3), dt,
-                                primary, primaryFilter, filter, a)
-                                .traverseAll();
+                        Functional.apply(txn, dt, spec, a).traverseAll();
 
                         return null;
                     }
@@ -146,9 +437,7 @@ public class FunctionalTest {
                 new TransactionCallback<Integer>() {
                     @Override
                     public Integer inTransaction(Transaction txn) {
-                        return Functional.reduce(txn, new Target(
-                                G414InnoDBTableDefs.TABLE_3), primary,
-                                primaryFilter, filter, r, sum2);
+                        return Functional.reduce(txn, spec, r, sum2);
                     }
                 });
 
@@ -167,13 +456,6 @@ public class FunctionalTest {
             }
         };
 
-        final Filter filter = new Filter() {
-            public Boolean map(Map<String, Object> row) {
-                return ((Number) row.get("b")).intValue() % 2 == 1
-                        && ((Number) row.get("a")).intValue() % 2 == 0;
-            }
-        };
-
         final AtomicLong found = new AtomicLong();
 
         final Mapping<Void> m = new Mapping<Void>() {
@@ -184,12 +466,14 @@ public class FunctionalTest {
             };
         };
 
+        final TraversalSpec spec0 = new TraversalSpec(new Target(
+                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter,
+                null);
+
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
                     public Void inTransaction(Transaction txn) {
-                        Functional.foreach(txn, new Target(
-                                G414InnoDBTableDefs.TABLE_3, "bc"), primary,
-                                primaryFilter, null, m);
+                        Functional.foreach(txn, spec0, m);
 
                         return null;
                     }
@@ -199,13 +483,21 @@ public class FunctionalTest {
 
         found.set(0);
 
+        final Filter filter = new Filter() {
+            public Boolean map(Map<String, Object> row) {
+                return ((Number) row.get("b")).intValue() % 2 == 1
+                        && ((Number) row.get("a")).intValue() % 2 == 0;
+            }
+        };
+
+        final TraversalSpec spec1 = new TraversalSpec(new Target(
+                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter,
+                filter);
+
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
                     public Void inTransaction(Transaction txn) {
-                        Functional.map(txn,
-                                new Target(G414InnoDBTableDefs.TABLE_3, "bc"),
-                                primary, primaryFilter, filter, m)
-                                .traverseAll();
+                        Functional.map(txn, spec1, m).traverseAll();
 
                         return null;
                     }
@@ -225,9 +517,7 @@ public class FunctionalTest {
                 new TransactionCallback<Integer>() {
                     @Override
                     public Integer inTransaction(Transaction txn) {
-                        return Functional.reduce(txn, new Target(
-                                G414InnoDBTableDefs.TABLE_3, "bc"), primary,
-                                primaryFilter, filter, r, sum);
+                        return Functional.reduce(txn, spec1, r, sum);
                     }
                 });
 
@@ -249,10 +539,7 @@ public class FunctionalTest {
                 new TransactionCallback<Void>() {
                     @Override
                     public Void inTransaction(Transaction txn) {
-                        Functional.apply(txn,
-                                new Target(G414InnoDBTableDefs.TABLE_3, "bc"),
-                                dt, primary, primaryFilter, filter, a)
-                                .traverseAll();
+                        Functional.apply(txn, dt, spec1, a).traverseAll();
 
                         return null;
                     }
@@ -264,13 +551,77 @@ public class FunctionalTest {
                 new TransactionCallback<Integer>() {
                     @Override
                     public Integer inTransaction(Transaction txn) {
-                        return Functional.reduce(txn, new Target(
-                                G414InnoDBTableDefs.TABLE_3, "bc"), primary,
-                                primaryFilter, filter, r, sum2);
+                        return Functional.reduce(txn, spec1, r, sum2);
                     }
                 });
 
         Assert.assertEquals(90, val2.intValue());
+    }
+
+    public void testNoneMutation() throws Exception {
+        populate();
+
+        final Map<String, Object> primary = new HashMap<String, Object>();
+        primary.put("b", 1);
+
+        final Filter primaryFilter = new Filter() {
+            public Boolean map(Map<String, Object> row) {
+                return ((Number) row.get("b")).intValue() == 1;
+            }
+        };
+
+        final TraversalSpec spec = new TraversalSpec(new Target(
+                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter,
+                null);
+
+        final Mapping<Mutation> a = new Mapping<Mutation>() {
+            public Mutation map(Map<String, Object> row) {
+                return new Mutation(MutationType.NONE, null);
+            };
+        };
+
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Functional.apply(txn, dt, spec, a).traverseAll();
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testDeleteMutation() throws Exception {
+        populate();
+
+        final Map<String, Object> primary = new HashMap<String, Object>();
+        primary.put("b", 1);
+
+        final Filter primaryFilter = new Filter() {
+            public Boolean map(Map<String, Object> row) {
+                return ((Number) row.get("b")).intValue() == 1;
+            }
+        };
+
+        final TraversalSpec spec = new TraversalSpec(new Target(
+                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter,
+                null);
+
+        final Mapping<Mutation> a = new Mapping<Mutation>() {
+            public Mutation map(Map<String, Object> row) {
+                return new Mutation(MutationType.DELETE, row);
+            };
+        };
+
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Functional.apply(txn, dt, spec, a).traverseAll();
+
+                        return null;
+                    }
+                });
     }
 
     private void populate() throws Exception {
@@ -281,13 +632,13 @@ public class FunctionalTest {
                         for (int i = 0; i < 6; i++) {
                             for (int j = 0; j < 6; j++) {
                                 for (int k = 0; k < 2; k++) {
-                                    Map<String, Object> m = new HashMap<String, Object>();
+                                    Map<String, Object> m = new LinkedHashMap<String, Object>();
                                     m.put("a", i);
                                     m.put("b", k);
                                     m.put("c", j);
                                     m.put("d", j);
 
-                                    dt.insert(txn, G414InnoDBTableDefs.TABLE_3,
+                                    dt.insert(txn, TableDefinitions.TABLE_3,
                                             m);
                                 }
                             }
@@ -296,5 +647,26 @@ public class FunctionalTest {
                         return null;
                     }
                 });
+    }
+
+    private Map<String, Object> mapOf(Object... vals) {
+        if (vals == null) {
+            return Collections.emptyMap();
+        }
+
+        if (vals.length % 2 != 0) {
+            throw new IllegalArgumentException(
+                    "must have even number of keys/values");
+        }
+
+        Map<String, Object> result = new LinkedHashMap<String, Object>();
+        for (int i = 0; i < vals.length; i += 2) {
+            String key = (String) vals[i];
+            Object value = vals[i + 1];
+
+            result.put(key, value);
+        }
+
+        return Collections.unmodifiableMap(result);
     }
 }

@@ -1,6 +1,6 @@
 package com.g414.haildb;
 
-public class G414InnoDBTableDefs {
+public class TableDefinitions {
     public static final String SCHEMA_NAME = "foo";
 
     public static final String TABLE_1_NAME = "foo/bar";
@@ -57,22 +57,22 @@ public class G414InnoDBTableDefs {
     }
 
     public static void createTables(Database d) {
-        if (!d.tableExists(G414InnoDBTableDefs.TABLE_1)) {
-            d.createTable(G414InnoDBTableDefs.TABLE_1);
+        if (!d.tableExists(TableDefinitions.TABLE_1)) {
+            d.createTable(TableDefinitions.TABLE_1);
             System.out.println("Created table: "
-                    + G414InnoDBTableDefs.TABLE_1_NAME);
+                    + TableDefinitions.TABLE_1_NAME);
         }
 
-        if (!d.tableExists(G414InnoDBTableDefs.TABLE_2)) {
-            d.createTable(G414InnoDBTableDefs.TABLE_2);
+        if (!d.tableExists(TableDefinitions.TABLE_2)) {
+            d.createTable(TableDefinitions.TABLE_2);
             System.out.println("Created table: "
-                    + G414InnoDBTableDefs.TABLE_2_NAME);
+                    + TableDefinitions.TABLE_2_NAME);
         }
 
-        if (!d.tableExists(G414InnoDBTableDefs.TABLE_3)) {
-            d.createTable(G414InnoDBTableDefs.TABLE_3);
+        if (!d.tableExists(TableDefinitions.TABLE_3)) {
+            d.createTable(TableDefinitions.TABLE_3);
             System.out.println("Created table: "
-                    + G414InnoDBTableDefs.TABLE_3_NAME);
+                    + TableDefinitions.TABLE_3_NAME);
         }
     }
 

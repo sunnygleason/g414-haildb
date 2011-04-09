@@ -53,4 +53,10 @@ public class ColumnDef {
     public boolean is(ColumnAttribute attr) {
         return attrs.contains(attr);
     }
+
+    @Override
+    public String toString() {
+        return this.getName() + " " + this.getType() + "(" + this.getLength()
+                + ") " + attrs.toString();
+    }
 }
