@@ -41,10 +41,13 @@ public class TableDefinitions {
         TABLE_2 = b2.build();
 
         TableBuilder b3 = new TableBuilder(TABLE_3_NAME);
-        b3.addColumn("a", ColumnType.INT, 4, ColumnAttribute.NOT_NULL);
-        b3.addColumn("b", ColumnType.INT, 4, ColumnAttribute.NOT_NULL);
+        b3.addColumn("a", ColumnType.INT, 1, ColumnAttribute.NOT_NULL,
+                ColumnAttribute.UNSIGNED);
+        b3.addColumn("b", ColumnType.INT, 2, ColumnAttribute.NOT_NULL);
         b3.addColumn("c", ColumnType.INT, 4, ColumnAttribute.NOT_NULL);
-        b3.addColumn("d", ColumnType.INT, 4, ColumnAttribute.NOT_NULL);
+        b3.addColumn("d", ColumnType.INT, 8, ColumnAttribute.NOT_NULL);
+        b3.addColumn("e", ColumnType.VARCHAR, 20, ColumnAttribute.NOT_NULL);
+        b3.addColumn("f", ColumnType.BLOB, 20);
 
         b3.addIndex("PRIMARY", "a", 0, true, true);
         b3.addIndex("PRIMARY", "b", 0, true, true);
@@ -59,20 +62,14 @@ public class TableDefinitions {
     public static void createTables(Database d) {
         if (!d.tableExists(TableDefinitions.TABLE_1)) {
             d.createTable(TableDefinitions.TABLE_1);
-            System.out.println("Created table: "
-                    + TableDefinitions.TABLE_1_NAME);
         }
 
         if (!d.tableExists(TableDefinitions.TABLE_2)) {
             d.createTable(TableDefinitions.TABLE_2);
-            System.out.println("Created table: "
-                    + TableDefinitions.TABLE_2_NAME);
         }
 
         if (!d.tableExists(TableDefinitions.TABLE_3)) {
             d.createTable(TableDefinitions.TABLE_3);
-            System.out.println("Created table: "
-                    + TableDefinitions.TABLE_3_NAME);
         }
     }
 
@@ -80,5 +77,8 @@ public class TableDefinitions {
         d.truncateTable(TABLE_1);
         d.truncateTable(TABLE_2);
         d.truncateTable(TABLE_3);
+        d.dropTable(TABLE_1);
+        d.dropTable(TABLE_2);
+        d.dropTable(TABLE_3);
     }
 }

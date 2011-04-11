@@ -1,6 +1,5 @@
 package com.g414.haildb;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,25 +11,11 @@ import com.sun.jna.Pointer;
 public class Tuple {
     protected final List<ColumnDef> columns;
     protected Pointer tupl;
-    private boolean deleted = false;
+    private volatile boolean deleted = false;
 
     public Tuple(Pointer tupl, List<ColumnDef> columns) {
         this.tupl = tupl;
         this.columns = columns;
-    }
-
-    public List<Object> values() {
-        if (deleted) {
-            throw new IllegalStateException("tuple already deleted!");
-        }
-
-        List<Object> values = new ArrayList<Object>(this.columns.size());
-
-        for (ColumnDef def : this.columns) {
-            values.add(getValue(def));
-        }
-
-        return Collections.unmodifiableList(values);
     }
 
     public Map<String, Object> valueMap() {
@@ -62,6 +47,7 @@ public class Tuple {
         }
 
         if (tupl != null && !tupl.equals(Pointer.NULL)) {
+            deleted = true;
             HailDB.ib_tuple_delete(tupl);
         }
     }

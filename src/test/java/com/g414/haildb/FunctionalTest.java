@@ -43,6 +43,50 @@ public class FunctionalTest {
         TableDefinitions.clearTables(db);
     }
 
+    public void testDoubleDeletion() throws Exception {
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Cursor c = txn.openTable(TableDefinitions.TABLE_1);
+                        Tuple t = c.createClusteredIndexReadTuple();
+                        t.delete();
+
+                        try {
+                            t.delete();
+                            Assert.fail("expected exception!");
+                        } catch (IllegalStateException expected) {
+                        } finally {
+                            c.close();
+                        }
+
+                        return null;
+                    }
+                });
+    }
+
+    public void testClearAfterDeletion() throws Exception {
+        dt.inTransaction(TransactionLevel.REPEATABLE_READ,
+                new TransactionCallback<Void>() {
+                    @Override
+                    public Void inTransaction(Transaction txn) {
+                        Cursor c = txn.openTable(TableDefinitions.TABLE_1);
+                        Tuple t = c.createClusteredIndexReadTuple();
+                        t.delete();
+
+                        try {
+                            t.clear();
+                            Assert.fail("expected exception!");
+                        } catch (IllegalStateException expected) {
+                        } finally {
+                            c.close();
+                        }
+
+                        return null;
+                    }
+                });
+    }
+
     public void testException() throws Exception {
         try {
             dt.inTransaction(TransactionLevel.REPEATABLE_READ,
@@ -69,6 +113,8 @@ public class FunctionalTest {
                             p2.put("b", -1L);
                             p2.put("c", -1L);
                             p2.put("d", -1L);
+                            p2.put("e", "t");
+                            p2.put("f", "f".getBytes());
 
                             dt.insert(txn, TableDefinitions.TABLE_3, p2);
                             dt.insert(txn, TableDefinitions.TABLE_3, p2);
@@ -92,6 +138,8 @@ public class FunctionalTest {
                         p2.put("b", -1L);
                         p2.put("c", -1L);
                         p2.put("d", -1L);
+                        p2.put("e", "t");
+                        p2.put("f", "f".getBytes());
 
                         dt.insert(txn, TableDefinitions.TABLE_3, p2);
                         dt.update(txn, TableDefinitions.TABLE_3, p2);
@@ -111,6 +159,8 @@ public class FunctionalTest {
                         p2.put("b", -1L);
                         p2.put("c", -1L);
                         p2.put("d", -1L);
+                        p2.put("e", "t");
+                        p2.put("f", "f".getBytes());
 
                         Assert.assertFalse(dt.update(txn,
                                 TableDefinitions.TABLE_3, p2));
@@ -132,6 +182,8 @@ public class FunctionalTest {
                         p2.put("b", -1L);
                         p2.put("c", -1L);
                         p2.put("d", -1L);
+                        p2.put("e", "t");
+                        p2.put("f", "f".getBytes());
 
                         dt.insert(txn, TableDefinitions.TABLE_3, p2);
                         dt.delete(txn, TableDefinitions.TABLE_3, p2);
@@ -183,10 +235,12 @@ public class FunctionalTest {
                     @Override
                     public Void inTransaction(Transaction txn) {
                         Map<String, Object> p2 = new LinkedHashMap<String, Object>();
-                        p2.put("a", -1L);
+                        p2.put("a", 1L);
                         p2.put("b", -1L);
                         p2.put("c", -1L);
                         p2.put("d", -1L);
+                        p2.put("e", "t");
+                        p2.put("f", "f".getBytes());
 
                         dt.insertOrUpdate(txn, TableDefinitions.TABLE_3, p2);
                         dt.insertOrUpdate(txn, TableDefinitions.TABLE_3, p2);
@@ -276,14 +330,17 @@ public class FunctionalTest {
 
                         try {
                             Assert.assertEquals(
-                                    mapOf("a", 0, "b", 0, "c", 0, "d", 0)
-                                            .toString(), iter.next().toString());
+                                    mapOf("a", 0, "b", 0, "c", 0, "d", 0, "e",
+                                            "t", "f", null).toString(), iter
+                                            .next().toString());
                             Assert.assertEquals(
-                                    mapOf("a", 0, "b", 0, "c", 1, "d", 1)
-                                            .toString(), iter.next().toString());
+                                    mapOf("a", 0, "b", 0, "c", 1, "d", 1, "e",
+                                            "t", "f", null).toString(), iter
+                                            .next().toString());
                             Assert.assertEquals(
-                                    mapOf("a", 0, "b", 0, "c", 2, "d", 2)
-                                            .toString(), iter.next().toString());
+                                    mapOf("a", 0, "b", 0, "c", 2, "d", 2, "e",
+                                            "t", "f", null).toString(), iter
+                                            .next().toString());
                         } finally {
                             iter.close();
                         }
@@ -308,8 +365,8 @@ public class FunctionalTest {
         };
 
         final TraversalSpec spec = new TraversalSpec(new Target(
-                TableDefinitions.TABLE_3), CursorDirection.DESC,
-                SearchMode.LE, null, primaryFilter, null);
+                TableDefinitions.TABLE_3), CursorDirection.DESC, SearchMode.LE,
+                null, primaryFilter, null);
 
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
@@ -319,14 +376,17 @@ public class FunctionalTest {
 
                         try {
                             Assert.assertEquals(
-                                    mapOf("a", 5, "b", 1, "c", 5, "d", 5)
-                                            .toString(), iter.next().toString());
+                                    mapOf("a", 5, "b", 1, "c", 5, "d", 5, "e",
+                                            "t", "f", null).toString(), iter
+                                            .next().toString());
                             Assert.assertEquals(
-                                    mapOf("a", 5, "b", 1, "c", 4, "d", 4)
-                                            .toString(), iter.next().toString());
+                                    mapOf("a", 5, "b", 1, "c", 4, "d", 4, "e",
+                                            "t", "f", null).toString(), iter
+                                            .next().toString());
                             Assert.assertEquals(
-                                    mapOf("a", 5, "b", 1, "c", 3, "d", 3)
-                                            .toString(), iter.next().toString());
+                                    mapOf("a", 5, "b", 1, "c", 3, "d", 3, "e",
+                                            "t", "f", null).toString(), iter
+                                            .next().toString());
                         } finally {
                             iter.close();
                         }
@@ -467,8 +527,7 @@ public class FunctionalTest {
         };
 
         final TraversalSpec spec0 = new TraversalSpec(new Target(
-                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter,
-                null);
+                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter, null);
 
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
@@ -491,8 +550,7 @@ public class FunctionalTest {
         };
 
         final TraversalSpec spec1 = new TraversalSpec(new Target(
-                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter,
-                filter);
+                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter, filter);
 
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
@@ -571,8 +629,7 @@ public class FunctionalTest {
         };
 
         final TraversalSpec spec = new TraversalSpec(new Target(
-                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter,
-                null);
+                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter, null);
 
         final Mapping<Mutation> a = new Mapping<Mutation>() {
             public Mutation map(Map<String, Object> row) {
@@ -604,8 +661,7 @@ public class FunctionalTest {
         };
 
         final TraversalSpec spec = new TraversalSpec(new Target(
-                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter,
-                null);
+                TableDefinitions.TABLE_3, "bc"), primary, primaryFilter, null);
 
         final Mapping<Mutation> a = new Mapping<Mutation>() {
             public Mutation map(Map<String, Object> row) {
@@ -637,9 +693,10 @@ public class FunctionalTest {
                                     m.put("b", k);
                                     m.put("c", j);
                                     m.put("d", j);
+                                    m.put("e", "t");
+                                    m.put("f", null);
 
-                                    dt.insert(txn, TableDefinitions.TABLE_3,
-                                            m);
+                                    dt.insert(txn, TableDefinitions.TABLE_3, m);
                                 }
                             }
                         }
