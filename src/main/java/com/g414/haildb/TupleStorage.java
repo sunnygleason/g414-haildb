@@ -212,11 +212,16 @@ public class TupleStorage {
         }
 
         int length = stringBytes.length + 1;
+
         Memory m = new Memory(length);
+        m.clear();
+
         ByteBuffer buf = m.getByteBuffer(0, length).order(
                 ByteOrder.nativeOrder());
 
-        buf.put(stringBytes).put((byte) 0).flip();
+        buf.put(new byte[length]).flip();
+        buf.put(stringBytes).put((byte) 0);
+
         return Native.getDirectBufferPointer(buf);
     }
 }

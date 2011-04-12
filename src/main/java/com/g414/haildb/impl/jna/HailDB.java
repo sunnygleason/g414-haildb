@@ -765,7 +765,7 @@ public class HailDB implements Library {
 
     public static native void ib_table_schema_delete(Pointer ib_tbl_sch);
 
-    public static native int ib_table_schema_create(String name,
+    public static native int ib_table_schema_create(Pointer name,
             PointerByReference ib_tbl_sch, int ib_tbl_fmt, int page_size);
 
     public static native int ib_index_schema_add_col(Pointer ib_idx_sch,
