@@ -146,9 +146,8 @@ public class Database {
         }
 
         PointerByReference schema = new PointerByReference();
-        Util.assertSuccess(HailDB.ib_table_schema_create(TupleStorage
-                .getDirectMemoryString(tableDef.getName().getBytes()), schema,
-                type.getCode(), pageSize));
+        Util.assertSuccess(HailDB.ib_table_schema_create(tableDef.getName(),
+                schema, type.getCode(), pageSize));
 
         for (ColumnDef def : tableDef.getColumnDefs().values()) {
             int attr = 0;
