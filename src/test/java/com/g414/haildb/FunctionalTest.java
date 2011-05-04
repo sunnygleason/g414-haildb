@@ -43,6 +43,16 @@ public class FunctionalTest {
         TableDefinitions.clearTables(db);
     }
 
+    public void testTableCreateDelete() throws Exception {
+        for (int i = 0; i < 1000; i++) {
+            TableDef def = (new TableBuilder(String.format("%s/atable%02d",
+                    TableDefinitions.SCHEMA_NAME, i))).addColumn("a",
+                    ColumnType.INT, 4).build();
+            db.createTable(def);
+            db.dropTable(def);
+        }
+    }
+
     public void testDoubleDeletion() throws Exception {
         dt.inTransaction(TransactionLevel.REPEATABLE_READ,
                 new TransactionCallback<Void>() {
