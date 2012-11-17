@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.g414.haildb</groupId>
   <artifactId>g414-haildb</artifactId>
-  <version>0.2.2</version>
+  <version>0.2.3-SNAPSHOT</version>
 
   <scm>
     <connection>scm:git:git@github.com:sunnygleason/g414-haildb.git</connection>
