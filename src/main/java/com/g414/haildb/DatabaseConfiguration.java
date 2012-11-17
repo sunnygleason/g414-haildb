@@ -24,8 +24,8 @@ public class DatabaseConfiguration {
     private FileFormat fileFormat = FileFormat.BARRACUDA;
     private int openFilesLimit = 300;
     private int lockWaitTimeoutSeconds = 60;
-    private String logBufferSize = "1M";
-    private String logFileSize = "16M";
+    private int logBufferSize = 1024 * 1024;
+    private int logFileSize = 16 * 1024 * 1024;
     private int logFilesInGroup = 2;
     private String logFileHomeDirectory = "." + File.separator;
     private String dataHomeDir = "." + File.separator;
@@ -138,19 +138,19 @@ public class DatabaseConfiguration {
         this.lockWaitTimeoutSeconds = lockWaitTimeoutSeconds;
     }
 
-    public String getLogBufferSize() {
+    public int getLogBufferSize() {
         return logBufferSize;
     }
 
-    public void setLogBufferSize(String logBufferSize) {
+    public void setLogBufferSize(int logBufferSize) {
         this.logBufferSize = logBufferSize;
     }
 
-    public String getLogFileSize() {
+    public int getLogFileSize() {
         return logFileSize;
     }
 
-    public void setLogFileSizeMegabytes(String logFileSize) {
+    public void setLogFileSizeMegabytes(int logFileSize) {
         this.logFileSize = logFileSize;
     }
 

@@ -79,6 +79,10 @@ public class Database {
                 c.getDataHomeDir()));
         Util.assertSuccess(HailDB.ib_cfg_set("log_group_home_dir",
                 c.getLogFileHomeDirectory()));
+        Util.assertSuccess(HailDB.ib_cfg_set("log_buffer_size",
+                c.getLogBufferSize()));
+        Util.assertSuccess(HailDB.ib_cfg_set("log_file_size",
+                c.getLogFileSize()));
         Util.assertSuccess(HailDB.ib_cfg_set("flush_log_at_trx_commit", c
                 .getFlushLogAtTrxCommitMode().getCode()));
         Util.assertSuccess(HailDB.ib_cfg_set("flush_method", c.getFlushMethod()
