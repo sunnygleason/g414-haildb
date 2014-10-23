@@ -191,7 +191,13 @@ public class TupleStorage {
             return null;
         }
 
-        return HailDB.ib_col_get_value(tupl.tupl, index).getString(0);
+        // InnoDB data doesn't ends with zero, so getString() method should not be used
+        try {
+            String res = new String(HailDB.ib_col_get_value(tupl.tupl, index).getByteArray(0, len), "utf-8");
+            return res;
+        } catch (UnsupportedEncodingException e) {
+            return "";
+        }
     }
 
     private static Pointer getDirectMemoryBytes(byte[] value) {
